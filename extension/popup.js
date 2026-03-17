@@ -4,11 +4,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const exportBtn = document.getElementById("export-btn");
   const clearBtn = document.getElementById("clear-btn");
 
-  const BACKEND_URL = "http://localhost:3001/download";
+  const BACKEND_URL = `${CONFIG.API_URL}/download`;
 
   function downloadSong(song) {
     const filename = `${song.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mp3`;
-    const url = `${BACKEND_URL}?v=${song.id}`;
+    const url = `${BACKEND_URL}?v=${song.id}&title=${encodeURIComponent(song.title)}`;
     
     const a = document.createElement("a");
     a.href = url;
@@ -75,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
   downloadAllBtn.onclick = () => {
     chrome.storage.local.get({ songs: [] }, (data) => {
       const songsEncoded = encodeURIComponent(JSON.stringify(data.songs));
-      const managerUrl = `http://localhost:3001/index.html?songs=${songsEncoded}`;
+      const managerUrl = `${CONFIG.API_URL}/index.html?songs=${songsEncoded}`;
       window.open(managerUrl, '_blank');
     });
   };

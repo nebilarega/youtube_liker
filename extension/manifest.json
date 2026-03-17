@@ -19,6 +19,7 @@
         "https://*.youtube.com/watch*"
       ],
       "js": [
+        "config.js",
         "content.js"
       ],
       "css": [
