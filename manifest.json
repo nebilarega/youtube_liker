@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Song Liker",
+  "version": "1.0",
+  "description": "Adds a button to save YouTube songs and export them to JSON.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://*.youtube.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.youtube.com/watch*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ]
+    }
+  ]
+}

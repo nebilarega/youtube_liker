@@ -1,0 +1,13 @@
+# Chrome Extension
+*.crx
+*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+plans/
+node_modules/
+.env
+.gemini/
