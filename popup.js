@@ -1,7 +1,22 @@
 document.addEventListener("DOMContentLoaded", () => {
   const listElement = document.getElementById("song-list");
+  const downloadAllBtn = document.getElementById("download-all-btn");
   const exportBtn = document.getElementById("export-btn");
   const clearBtn = document.getElementById("clear-btn");
+
+  const BACKEND_URL = "http://localhost:3001/download";
+
+  function downloadSong(song) {
+    const filename = `${song.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mp3`;
+    const url = `${BACKEND_URL}?v=${song.id}`;
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
 
   function loadSongs() {
     chrome.storage.local.get({ songs: [] }, (data) => {
@@ -9,22 +24,37 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.songs.length === 0) {
         listElement.innerHTML = "<li class='song-item'>No songs added yet.</li>";
         exportBtn.disabled = true;
+        downloadAllBtn.disabled = true;
         return;
       }
       exportBtn.disabled = false;
+      downloadAllBtn.disabled = false;
+      
       data.songs.reverse().forEach((song) => {
         const li = document.createElement("li");
         li.className = "song-item";
         li.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="flex: 1; overflow: hidden;">
+            <div style="flex: 1; overflow: hidden; cursor: pointer;" class="song-info" data-id="${song.id}">
               <div class="song-title">${song.title}</div>
               <div class="song-date">${new Date(song.addedAt).toLocaleString()}</div>
             </div>
-            <button class="remove-btn" data-id="${song.id}" style="background: none; border: none; color: #ff4e4e; cursor: pointer; font-size: 18px; padding: 0 8px;">&times;</button>
+            <div style="display: flex; align-items: center;">
+              <button class="dl-btn" data-id="${song.id}" style="background: none; border: none; color: #3ea6ff; cursor: pointer; font-size: 16px; padding: 0 8px;">⬇️</button>
+              <button class="remove-btn" data-id="${song.id}" style="background: none; border: none; color: #ff4e4e; cursor: pointer; font-size: 18px; padding: 0 8px;">&times;</button>
+            </div>
           </div>
         `;
         listElement.appendChild(li);
+      });
+
+      // Add click listeners to download buttons
+      document.querySelectorAll(".dl-btn").forEach(btn => {
+        btn.onclick = (e) => {
+          const id = e.target.getAttribute("data-id");
+          const song = data.songs.find(s => s.id === id);
+          if (song) downloadSong(song);
+        };
       });
 
       // Add click listeners to remove buttons
@@ -41,6 +71,14 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   }
+
+  downloadAllBtn.onclick = () => {
+    chrome.storage.local.get({ songs: [] }, (data) => {
+      const songsEncoded = encodeURIComponent(JSON.stringify(data.songs));
+      const managerUrl = `http://localhost:3001/index.html?songs=${songsEncoded}`;
+      window.open(managerUrl, '_blank');
+    });
+  };
 
   exportBtn.onclick = () => {
     chrome.storage.local.get({ songs: [] }, (data) => {
