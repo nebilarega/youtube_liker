@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Song Liker - Download Manager</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0f0f0f; color: #fff; padding: 40px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { color: #3ea6ff; border-bottom: 1px solid #333; padding-bottom: 20px; }
+        .song-card { background: #1a1a1a; border-radius: 8px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #333; }
+        .song-info { flex: 1; overflow: hidden; }
+        .song-title { font-weight: bold; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .song-status { font-size: 13px; color: #aaa; }
+        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; min-width: 80px; text-align: center; }
+        .badge-pending { background: #333; color: #aaa; }
+        .badge-active { background: #3ea6ff; color: #000; }
+        .badge-ready { background: #2ba640; color: #fff; }
+        .badge-error { background: #ff4e4e; color: #fff; }
+        .controls { margin-top: 30px; display: flex; gap: 15px; align-items: center; }
+        button { padding: 12px 24px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-start { background: #3ea6ff; color: #000; }
+        .btn-zip { background: #f1c40f; color: #000; display: none; }
+        button:disabled { background: #333; color: #555; cursor: not-allowed; }
+        #progress-stats { color: #aaa; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Download Manager</h1>
+        <div id="song-list"></div>
+        <div class="controls">
+            <button id="start-btn" class="btn-start">Start Processing Batch</button>
+            <button id="zip-btn" class="btn-zip">Download as ZIP</button>
+            <div id="progress-stats"></div>
+        </div>
+    </div>
+    <script>
+        const socket = io();
+        const songListElement = document.getElementById('song-list');
+        const startBtn = document.getElementById('start-btn');
+        const zipBtn = document.getElementById('zip-btn');
+        const statsElement = document.getElementById('progress-stats');
+        
+        let songs = [];
+        let sessionId = null;
+        let processedCount = 0;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const songsRaw = urlParams.get('songs');
+        if (songsRaw) {
+            try {
+                songs = JSON.parse(decodeURIComponent(songsRaw));
+                renderSongs();
+            } catch (e) { console.error('Failed to parse songs', e); }
+        }
+
+        function renderSongs() {
+            songListElement.innerHTML = songs.map(song => `
+                <div class="song-card" id="card-${song.id}">
+                    <div class="song-info">
+                        <div class="song-title">${song.title}</div>
+                        <div class="song-status" id="status-text-${song.id}">Waiting for batch start...</div>
+                    </div>
+                    <span class="status-badge badge-pending" id="badge-${song.id}">PENDING</span>
+                </div>
+            `).join('');
+            updateStats();
+        }
+
+        function updateStats() {
+            statsElement.innerText = `${processedCount} / ${songs.length} songs processed`;
+        }
+
+        startBtn.onclick = () => {
+            startBtn.disabled = true;
+            socket.emit('start-batch');
+        };
+
+        socket.on('batch-ready', async (data) => {
+            sessionId = data.sessionId;
+            for (const song of songs) {
+                await processSong(song);
+            }
+            zipBtn.style.display = 'block';
+            zipBtn.onclick = () => {
+                window.location.href = `/download-zip?sessionId=${sessionId}`;
+            };
+        });
+
+        function processSong(song) {
+            return new Promise((resolve) => {
+                const badge = document.getElementById(`badge-${song.id}`);
+                const statusText = document.getElementById(`status-text-${song.id}`);
+                
+                badge.innerText = 'ACTIVE';
+                badge.className = 'status-badge badge-active';
+
+                socket.emit('process-song', { ...song, sessionId });
+
+                const handler = (data) => {
+                    if (data.id !== song.id) return;
+                    statusText.innerText = data.message;
+
+                    if (data.status === 'ready' || data.status === 'error') {
+                        processedCount++;
+                        updateStats();
+                        badge.innerText = data.status.toUpperCase();
+                        badge.className = `status-badge badge-${data.status}`;
+                        socket.off('status', handler);
+                        resolve();
+                    }
+                };
+                socket.on('status', handler);
+            });
+        }
+    </script>
+</body>
+</html>
