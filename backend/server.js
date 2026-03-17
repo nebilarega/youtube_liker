@@ -10,27 +10,28 @@ const archiver = require('archiver');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
-});
-
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 
 // Ensure downloads directory exists
 fs.ensureDirSync(DOWNLOADS_DIR);
 
-app.use(cors());
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: CORS_ORIGIN, methods: ["GET", "POST"] }
+});
 
 // Helper to sanitize filenames
 function sanitizeFilename(name) {
   return name.replace(/[<>:"/\\|?*]/g, '_').trim();
 }
 
-// Download endpoint for single songs (remains as fallback)
+// Download endpoint for single songs
 app.get('/download', (req, res) => {
   const { v: videoId, title } = req.query;
   if (!videoId) return res.status(400).send('Missing video ID');
@@ -67,7 +68,6 @@ app.get('/download-zip', async (req, res) => {
   
   archive.on('end', () => {
     console.log(`ZIP finished for ${sessionId}. Cleaning up...`);
-    // Cleanup after 10 seconds to ensure the stream finishes
     setTimeout(() => fs.remove(sessionDir).catch(err => console.error('Cleanup error:', err)), 10000);
   });
 
@@ -76,6 +76,7 @@ app.get('/download-zip', async (req, res) => {
 
 // Socket.io for Batch Processing
 io.on('connection', (socket) => {
+  console.log('Client connected');
   let sessionId = null;
 
   socket.on('start-batch', (data) => {
@@ -117,5 +118,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Backend running at http://localhost:${PORT}`);
+  console.log(`Backend running on port ${PORT}`);
 });
